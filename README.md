@@ -155,22 +155,18 @@ Some additional notes:
 
 ---
 
-### Queries and Indices
+### Queries and indexes
 
-This is a simple list of queries I'll probably want:
+This is a simple list of queries I'll probably want. For more notes on indexes, [click here][indexes-link].
 
-<table>
-<tr>
-Get all books (in alphabetical order)
+#### Get all books (in alphabetical order)
 
 ```sql
 SELECT * FROM books
 ORDER BY title ASC;
 ```
 
-</tr>
-<tr>
-Get all books in a genre
+#### Get all books in a genre
 
 ```sql
 SELECT b.*
@@ -180,10 +176,7 @@ JOIN genres g ON g.id = bg.genre_id
 WHERE g.name = 'Fantasy';
 ```
 
-</tr>
-<tr>
-Get all books by an author
-<td>
+#### Get all books by an author
 
 ```sql
 SELECT b.*
@@ -193,19 +186,15 @@ JOIN authors a ON a.id = ba.author_id
 WHERE a.l_name = 'Tolkien';
 ```
 
-</td>
-<td>
+The authors table is organized by `.id`, so having an index already sorted by `l_name` will speed up
+author queries:
 
 ```sql
 CREATE INDEX idx_authors_l_name ON authors(l_name);
 ```
 
-The authors table is organized by `.id`, so having an index already sorted by `l_name` will speed up
-author queries.
 
-</td>
-</tr>
-</table>
+
 
 <!-- LINK SOURCES -->
 
@@ -214,5 +203,6 @@ author queries.
 [sketch3]: ./images/sketch3.png
 [sketch4]: ./images/sketch4.png
 [normalization-link]: ./normalization-notes.md
+[indexes-link]: ./indexes-notes.md
 
 <!-- END LINK REFERENCES -->
