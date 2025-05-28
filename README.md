@@ -153,6 +153,59 @@ Some additional notes:
   `users(id)`, so when a user in the `users` table is deleted, the deletion "cascades" down to
   `user_books` as well and deletes their saved books.
 
+---
+
+### Queries and Indices
+
+This is a simple list of queries I'll probably want:
+
+<table>
+<tr>
+Get all books (in alphabetical order)
+
+```sql
+SELECT * FROM books
+ORDER BY title ASC;
+```
+
+</tr>
+<tr>
+Get all books in a genre
+
+```sql
+SELECT b.*
+FROM books b
+JOIN book_genres bg ON b.id = bg.book_id
+JOIN genres g ON g.id = bg.genre_id
+WHERE g.name = 'Fantasy';
+```
+
+</tr>
+<tr>
+Get all books by an author
+<td>
+
+```sql
+SELECT b.*
+FROM books b
+JOIN book_authors ba ON b.id = ba.book_id
+JOIN authors a ON a.id = ba.author_id
+WHERE a.l_name = 'Tolkien';
+```
+
+</td>
+<td>
+
+```sql
+CREATE INDEX idx_authors_l_name ON authors(l_name);
+```
+
+The authors table is organized by `.id`, so having an index already sorted by `l_name` will speed up
+author queries.
+
+</td>
+</tr>
+</table>
 
 <!-- LINK SOURCES -->
 
