@@ -266,6 +266,12 @@ CREATE INDEX idx_book_genres_genre ON book_genres(genre_id)
 
 For each book, it would then look up the book in the `books` table.
 
+---
+### Future topics to add:
+- Complicated JOINs
+- Transactions
+- DB Migrations
+- SQLite vs. Postgresql
 
 <!-- LINK SOURCES -->
 
