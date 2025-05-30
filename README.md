@@ -1,12 +1,21 @@
 This is a repo for notes on SQL and to practice creating SQL schemas.
 
-The first mock-project is a bookshelf app where users can catalog books they've read or want to read.
+The first mock-project is a bookshelf app where users can organize books they've read and want to read.
 
 ---
+### Designing a schema:
+1. Identify entities\*
+2. List attributes
+3. Define relationships
+4. Sketch schema
+5. Plan sample queries
+
+\* The first step should probably be to define business requirements, but I just used an iterative process.
 
 ### Entities
 
-Using [excalidraw](https://excalidraw.com/), I started sketching the entities and tables this project would require.
+Using [excalidraw](https://excalidraw.com/), I started sketching the entities and attributes
+bookshelf app would require.
 
 ![][sketch1]
 
@@ -15,7 +24,6 @@ arbitrarily knew I wanted "users" to categorize books according to status and to
 books. It would be better to start with a defined list of requirements, but... I didn't.
 
 ---
-
 ![][sketch2]
 
 There are a few changes in this step. I realized "Author" should be its own entity
@@ -25,30 +33,28 @@ that the status would be an enum type and rating would be an int range. I also a
 "finish", and "added" dates as attributes for good measure.
 
 ---
-
 ![][sketch3]
 
 The main change here is starting to add relationships between the tables and creating primary keys.
 
 ---
-
 ![][sketch4]
 
 In this step I fix a couple of things after thinking more about the relationships.
 
-First, let's talk about the Genre table. The design before this overlooked the fact that books can
+First, let's talk about the Genres table. The design before this overlooked the fact that books can
 belong to multiple genres, which indicates another many-to-many relationship.
 
-You could create a denormalized `book` table with an attribute for `genres` that was an array of
-genres and this would be easier to set up initially and require fewer joins when displaying book
-details, but would make viewing all books in a genre inefficient because the database would have to
+You _could_ create a denormalized `book` table with an attribute for `genres` that is an array of
+genres, and this would be easier to set up initially and require fewer joins when displaying book
+details but it would make viewing all books in a genre inefficient because the database would have to
 scan every book record and check if the target genre exists within each array. Also, enums are
 checked at runtime and if you wanted to rename an enum, you'd have to migrate the enum type itself
 rather than just updating records.
 
 Many-to-many relationships require a junction table so we can maintain best practices around
-[normalization][normalization-link] (3NF). We _could_ keep the `book_genres` junction table and
-maintain 3NF by having it reference an enum `genre_type` like this:
+[normalization][normalization-link] (we're aiming for 3NF). We _could_ keep the `book_genres` junction table and
+maintain 3NF by having it reference an enum `genre_type` like this...
 
 ```sql
 CREATE TYPE genre_type AS ENUM ('fiction', 'non_fiction', 'mystery', 'romance', 'sci_fi');
@@ -60,19 +66,18 @@ CREATE TABLE book_genres (
 );
 ```
 
-But it's unlikely we will know all of the genres at the beginning and if any changes need to be
-made, it'd be safer and easier to change a `genres` table than an enum. Again, there could be
-new genres that get added over time and if `genres` was an enum, that would mean we'd have to change
+but it's unlikely we will know all of the genres at the beginning and if any changes need to be
+made, it'd be safer and easier to change a `genres` table than an enum. _If_ `genres` was an enum, that would mean we'd have to change
 the db schema and do a migration instead of simply inserting a row in the `genres` table.
 
 Second, and similar to the issue above, I fixed a many-to-many relationship between the `book` and
 `author` tables by creating a `book_authors` table (side note: I decided to adopt the convention of
 creating junction table names as a combination of the tables it was connecting. This means I'll end
 up changing "User's Book Status" to just `user_books` for the table name since the apostrophe can't
-be used in the table name if we want to be consistent in naming conventions, which I've come to prefer.)
+be used in the table name if we want to be consistent in naming conventions, which I've come to
+prefer.)
 
 ---
-
 ### Schema
 
 Below we have the full schema declaration containing the following:
@@ -154,10 +159,10 @@ Some additional notes:
   `user_books` as well and deletes their saved books.
 
 ---
-
 ### Queries and indexes
 
-This is a simple list of queries I'll probably want. For more notes on indexes, [click here][indexes-link].
+This is a sample list of queries I'll probably want. For more notes on indexes beyond what's
+discussed below, [click here][indexes-link].
 
 #### Get all books (in alphabetical order)
 
@@ -166,16 +171,51 @@ SELECT * FROM books
 ORDER BY title ASC;
 ```
 
-#### Get all books in a genre
+This is probably a query that would happen a lot for displaying books, so it makes sense to have an
+index for it:
+
+```sql
+CREATE INDEX idx_books_title ON books(title);
+```
+
+---
+#### Get all user books
 
 ```sql
 SELECT b.*
 FROM books b
-JOIN book_genres bg ON b.id = bg.book_id
-JOIN genres g ON g.id = bg.genre_id
-WHERE g.name = 'Fantasy';
+JOIN user_books ub ON b.id = ub.book_id
+WHERE ub.user_id = 1;
 ```
 
+Because the `user_books` table has a composite primary key of `(user_id, book_id)`, it would
+probably not be beneficial to have an index for this query. The db will efficiently filter by `user_id`, and for each matching row
+the db performs a lookup in the `books` table using `book_id`. Since that's also the primary key for
+that table (`books.id`), this part is also efficient.
+
+---
+#### Get all user's books of a particular reading status
+
+```sql
+SELECT b.*
+FROM books b
+JOIN user_books ub ON b.id = ub.book_id
+WHERE ub.user_id = 1
+  AND ub.status = 'finished';
+```
+
+Without an index, `user_books` is scanned for where both `user_id = 1`
+and `status = 'finished'` by using the
+primary key `user_id` and then filtering on `status = 'finished'` row by row.
+With the index, the db can directly locate only rows where `user = 1` AND `status = 'finished'`.
+Once the matches are found, the db planner fetches the corresponding `book_id`
+values from `user_books`, joins with the `books` table, and returns the book records.
+
+```sql
+CREATE INDEX idx_user_books_user_id_status ON user_books(user_id, status);
+```
+
+---
 #### Get all books by an author
 
 ```sql
@@ -186,14 +226,45 @@ JOIN authors a ON a.id = ba.author_id
 WHERE a.l_name = 'Tolkien';
 ```
 
-The authors table is organized by `.id`, so having an index already sorted by `l_name` will speed up
-author queries:
+The `authors` table is organized by `.id`, so having an index already sorted by `l_name` will speed up
+author queries...
 
 ```sql
 CREATE INDEX idx_authors_l_name ON authors(l_name);
 ```
 
+and once the `author.id` is found, the `book_authors` table is queries. Though this table uses a
+composite primary key, `(book_id, author_id)`, it would be beneficial to have an index on it for
+`author_id` since it comes second.
 
+```sql
+CREATE INDEX idx_book_authors_author ON book_authors(author_id)
+```
+
+Finally, the `books` table is queried using the `book.id`, which won't need an index.
+
+---
+#### Get all books in a genre
+
+```sql
+SELECT b.*
+FROM books b
+JOIN book_genres bg ON b.id = bg.book_id
+JOIN genres g ON g.id = bg.genre_id
+WHERE g.name = 'Fantasy';
+```
+
+This query joins books to genres through the book_genres junction table. Although it's similar in
+structure to the earlier user_books query, the optimization considerations are different and would probably only benefit from one index. The
+`genres` table would probably never exceed 1000 or even 100 rows, so adding an index on
+`genres(name)` wouldn't add much efficiency. Once the db has the `genre.id`, it could use an index
+to more efficiently look up all the books in that genre...
+
+```sql
+CREATE INDEX idx_book_genres_genre ON book_genres(genre_id)
+```
+
+For each book, it would then look up the book in the `books` table.
 
 
 <!-- LINK SOURCES -->
