@@ -1,4 +1,4 @@
-This is a repo for notes on SQL and to practice creating SQL schemas.
+This repo contains notes on SQL and was created so I could practice creating SQL schemas. The plan is to go through this process with a few different ideas/designs as exercises.
 
 The first mock-project is a bookshelf app where users can organize books they've read and want to read.
 
