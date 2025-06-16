@@ -90,8 +90,8 @@ class SQLiteConnectionEager:
     def execute(self, query: str, params: tuple[str, ...]):
         if not self.conn:
             raise RuntimeError("Connection not established.")
-        cur = self.conn.cursor()
-        cur.execute(query, params)
+        cursor = self.conn.cursor()
+        cursor.execute(query, params)
         self.conn.commit()
 
 
@@ -123,8 +123,9 @@ class SQLiteConnectionLazy:
 
     def connect(self):
         if self.conn is not None:
-            self.close()
-        self.conn = sqlite3.connect(self.db_path)
+            raise Warning("A connection is already established.")
+        else:
+            self.conn = sqlite3.connect(self.db_path)
 
     def _get_cursor(self) -> sqlite3.Cursor:
         if not self.conn:
@@ -137,8 +138,8 @@ class SQLiteConnectionLazy:
             self.conn = None
 
     def execute(self, query: str, params: tuple[str, ...]):
-        cur = self._get_cursor()
-        cur.execute(query, params)
+        cursor = self._get_cursor()
+        cursor.execute(query, params)
         if self.conn is None:
             raise RuntimeError("Database connection is not established.")
         self.conn.commit()
