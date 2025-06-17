@@ -1,5 +1,10 @@
 import sqlite3
 from typing import Any
+import logging
+
+
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
 
 
 class SQLiteConnectionContextManager:
@@ -60,7 +65,7 @@ class SQLiteConnectionContextManager:
 class SQLiteConnectionEager:
     def __init__(self, db_path: str):
         """
-        Initialize a SQLite connection immediately (Eager Connection Pattern).
+        Initialize a SQLite connection upon initialization (Eager Connection Pattern).
 
         This pattern establishes the database connection immediately upon object creation.
 
@@ -96,35 +101,24 @@ class SQLiteConnectionEager:
 
 
 class SQLiteConnectionLazy:
+    """Truly Lazy Pattern - connects only when execute() is called.
+
+    Pros:
+    - Connection is established only when needed, helping reduce connection overhead
+
+    Cons:
+    - Need to check/establish connection in class methods
+
+    Best for: Applications with infrequent database access or where connection overhead is a concern.
+    """
+
     def __init__(self, db_path: str):
-        """
-        Initialize a SQLite connection without connecting immediately (Lazy Pattern).
-
-        This pattern defers connection establishment until explicitly requested via connect(). It is
-        an improvement over the eager connection pattern by allowing more control over when the
-        connection is made, but still requires the user to manage the connection lifecycle and will
-        not inherently prevent resource leaks or avoid "too many connections" errors.
-
-        Pros:
-        - More control over when connections are established
-        - Can handle connection failures more gracefully by checking connection state
-        - Allows for connection pooling or reconnection logic
-
-        Cons:
-        - Requires explicit connect() call before use
-        - Potential for runtime errors if connect() is forgotten
-        - Need to check connection state in methods
-
-        Best for: Applications that need fine-grained control over connection lifecycle,
-        or when connections might not be needed immediately.
-        """
         self.db_path = db_path
-        self.conn: sqlite3.Connection | None = None
+        self.conn = None
 
-    def connect(self):
-        if self.conn is not None:
-            raise Warning("A connection is already established.")
-        else:
+    def _ensure_connection(self):
+        """Quietly ensure the connection is established."""
+        if not self.conn:
             self.conn = sqlite3.connect(self.db_path)
 
     def _get_cursor(self) -> sqlite3.Cursor:
@@ -138,10 +132,10 @@ class SQLiteConnectionLazy:
             self.conn = None
 
     def execute(self, query: str, params: tuple[str, ...]):
+        self._ensure_connection()  # Connects only when needed (when 'execute' is called)
         cursor = self._get_cursor()
         cursor.execute(query, params)
-        if self.conn is None:
-            raise RuntimeError("Database connection is not established.")
+        assert self.conn is not None
         self.conn.commit()
 
 
