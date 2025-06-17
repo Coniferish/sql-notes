@@ -143,7 +143,7 @@ class SQLiteConnectionLazy:
 
 class SQLiteConnectionSingleton:
     """
-    Singleton Pattern - ensures only one connection instance exists.
+    Singleton Pattern - ensures only one connection instance exists and has lazy initialization.
 
     Pros:
     - Guarantees single connection across application
@@ -180,4 +180,15 @@ class SQLiteConnectionPool:
     Best for: Multi-threaded applications with frequent database access.
     """
 
+    pass
+
+class SQLiteConnectionFactory:
+    pass
+
+
+class SQLiteConnectionDependencyInjection:
+    pass
+
+
+class SQLiteConnectionDecorator:
     pass
