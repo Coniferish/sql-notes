@@ -98,6 +98,7 @@ class SQLiteConnectionEager:
         cursor = self.conn.cursor()
         cursor.execute(query, params)
         self.conn.commit()
+        return cursor
 
 
 class SQLiteConnectionLazy:
@@ -137,6 +138,7 @@ class SQLiteConnectionLazy:
         cursor.execute(query, params)
         assert self.conn is not None
         self.conn.commit()
+        return cursor
 
 
 class SQLiteConnectionSingleton:
