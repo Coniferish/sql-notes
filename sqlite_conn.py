@@ -169,21 +169,25 @@ class SQLiteConnectionSingleton:
     _instance: "SQLiteConnectionSingleton | None" = None
     _conn: "sqlite3.Connection | None" = None
 
-    # -- __new__ is used to control instance creation and is called before __init__.
-    # -- Below is a common pattern for singletons in Python.
-    # -- The first call to __new__ will create the instance, but subsequent calls will return the
-    # -- same instance since _instance is a class variable that holds the singleton instance.
     def __new__(cls, db_path: str):
+        """__new__ is used to control instance creation (instantiation) and is called before __init__.
+
+        Below is a common pattern for singletons in Python.
+        The first call to __new__ will create the instance, but subsequent calls will return the
+        same instance since _instance is a class variable that holds the singleton instance.
+        """
         if cls._instance is None:
             # Create a new instance of the class (super is the object class in this case):
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    # -- __init__ is called after __new__ and is used to initialize the instance.
-    # -- Even though __new__ ensures a singleton, __2init__ still runs on every instantiation,
-    # -- even if the singleton already exists.
-    # -- We use a class variable guard (_initialized) to avoid re-initializing attributes (i.e. db_path).
     def __init__(self, db_path: str):
+        """Initialize the singleton instance with the database path.
+
+        Even though __new__ ensures a singleton and is run before this, __init__ still runs on
+        every instantiation, even if the singleton already exists.
+        We use a class variable guard (_initialized) to avoid re-initializing attributes (i.e. db_path).
+        """
         # -- Check if an instance has already been initialized to avoid re-initialization.
         if not getattr(self, "_initialized", False):
             self.db_path = db_path
