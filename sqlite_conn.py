@@ -191,7 +191,16 @@ class SQLiteConnectionSingleton:
             # -- class would affect all instances, which would conflict with resetting the singleton
             # -- during tests. This way it goes away when _instance is reset.
             self._initialized = True
-            return
+        else:
+            if self.db_path != db_path:
+                raise ValueError(
+                    f"Singleton already initialized with db_path='{self.db_path}'. "
+                    f"Cannot reinitialize with '{db_path}'"
+                )
+            logging.debug(
+                f"SQLiteConnectionSingleton already initialized with db_path='{self.db_path}'. "
+                "Using existing instance."
+            )
 
     def close(self):
         if self._conn:
