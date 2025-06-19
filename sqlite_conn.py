@@ -167,34 +167,30 @@ class SQLiteConnectionSingleton:
 
     # -- Class variables to hold the singleton instance and connection
     _instance: "SQLiteConnectionSingleton | None" = None
-    _conn: "sqlite3.Connection | None " = None
-    _initialized = False
+    _conn: "sqlite3.Connection | None" = None
 
     # -- __new__ is used to control instance creation and is called before __init__.
-    # -- This allows us to ensure only one instance is created.
-    # -- Note that we still need to pass db_path to __init__() for the connection.
-    # -- This is a common pattern for singletons in Python.
-    # -- The first call to __new__ will create the instance, subsequent calls will return the same instance.
+    # -- Below is a common pattern for singletons in Python.
+    # -- The first call to __new__ will create the instance, but subsequent calls will return the
+    # -- same instance since _instance is a class variable that holds the singleton instance.
     def __new__(cls, db_path: str):
         if cls._instance is None:
             # Create a new instance of the class (super is the object class in this case):
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    # -- __init__ is called after __new__ and is used to initialize the instance. --
-    # -- We use a class variable _initialized to prevent re-initialization because __init__() can
-    # -- be called multiple times even if the instance already exists.
-    _initialized = False
-    db_path: str
-
-    # -- Even though __new__ ensures a singleton, __init__ still runs on every instantiation,
-    # even if the singleton already exists. --
-    # -- We use a guard (_initialized) to avoid re-initializing attributes like db_path. --
+    # -- __init__ is called after __new__ and is used to initialize the instance.
+    # -- Even though __new__ ensures a singleton, __2init__ still runs on every instantiation,
+    # -- even if the singleton already exists.
+    # -- We use a class variable guard (_initialized) to avoid re-initializing attributes (i.e. db_path).
     def __init__(self, db_path: str):
-        # -- Prevent re-initialization (to prevent overwriting the initially set db_path). --
-        if not self._initialized:
+        # -- Prevent re-initialization (to prevent overwriting the initially set db_path).
+        if not getattr(self, "_initialized", False):
             self.db_path = db_path
-            self.__class__._initialized = True
+            # -- _initialized is set on the instance and not the class because setting it on the
+            # -- class would affect all instances, which would conflict with resetting the singleton
+            # -- during tests. This way it goes away when _instance is reset.
+            self._initialized = True
             return
 
     def close(self):
@@ -213,6 +209,11 @@ class SQLiteConnectionSingleton:
         cursor.execute(query, params)
         self._conn.commit()
         return cursor
+
+    @classmethod
+    def reset(cls):
+        cls._instance = None
+        cls._conn = None
 
 
 class SQLiteConnectionMultition:
