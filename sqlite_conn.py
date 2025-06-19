@@ -147,7 +147,7 @@ class SQLiteConnectionSingleton:
 
     Pros:
     - Guarantees single connection across application
-    - Prevents multiple connection overhead
+    - Prevents overhead from multiple connections
     - Simple global access
 
     Cons:
@@ -156,7 +156,79 @@ class SQLiteConnectionSingleton:
     - Global state can make debugging difficult
     - Not suitable for applications needing multiple databases
 
-    Best for: Simple applications with single database and minimal concurrency.
+    Best for: Simple applications with a single database and minimal concurrency.
+
+    Important notes particular to python:
+    - Python's module system loads each module only once, which can itself act as a singleton.
+      If all you need is shared state, a module-level variable or function may be sufficient.
+    - You could use a private class (`_PrivateClass`) at the module level, but you'd have to
+      hard-code or otherwise inject the db_path early.
+    """
+
+    # -- Class variables to hold the singleton instance and connection
+    _instance: "SQLiteConnectionSingleton | None" = None
+    _conn: "sqlite3.Connection | None " = None
+    _initialized = False
+
+    # -- __new__ is used to control instance creation and is called before __init__.
+    # -- This allows us to ensure only one instance is created.
+    # -- Note that we still need to pass db_path to __init__() for the connection.
+    # -- This is a common pattern for singletons in Python.
+    # -- The first call to __new__ will create the instance, subsequent calls will return the same instance.
+    def __new__(cls, db_path: str):
+        if cls._instance is None:
+            # Create a new instance of the class (super is the object class in this case):
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    # -- __init__ is called after __new__ and is used to initialize the instance. --
+    # -- We use a class variable _initialized to prevent re-initialization because __init__() can
+    # -- be called multiple times even if the instance already exists.
+    _initialized = False
+    db_path: str
+
+    # -- Even though __new__ ensures a singleton, __init__ still runs on every instantiation,
+    # even if the singleton already exists. --
+    # -- We use a guard (_initialized) to avoid re-initializing attributes like db_path. --
+    def __init__(self, db_path: str):
+        # -- Prevent re-initialization (to prevent overwriting the initially set db_path). --
+        if not self._initialized:
+            self.db_path = db_path
+            self.__class__._initialized = True
+            return
+
+    def close(self):
+        if self._conn:
+            self._conn.close()
+            self._conn = None
+
+    def connect(self):
+        if self._conn is None:
+            self._conn = sqlite3.connect(self.db_path)
+
+    def execute(self, query: str, params: tuple[str, ...] = ()) -> sqlite3.Cursor:
+        if self._conn is None:
+            raise RuntimeError("Connection not established. Call connect() first.")
+        cursor = self._conn.cursor()
+        cursor.execute(query, params)
+        self._conn.commit()
+        return cursor
+
+
+class SQLiteConnectionMultition:
+    """Multition Pattern - allows multiple instances with different configurations.
+
+    Pros:
+    - Multiple connections with different configurations
+    - Useful for applications needing multiple databases
+    - Each instance can have its own connection settings
+
+    Cons:
+    - More complex than Singleton
+    - Need to manage multiple instances
+    - Can lead to resource exhaustion if not managed properly
+
+    Best for: Applications needing multiple database connections with different settings.
     """
 
     pass
