@@ -184,7 +184,7 @@ class SQLiteConnectionSingleton:
     # -- even if the singleton already exists.
     # -- We use a class variable guard (_initialized) to avoid re-initializing attributes (i.e. db_path).
     def __init__(self, db_path: str):
-        # -- Prevent re-initialization (to prevent overwriting the initially set db_path).
+        # -- Check if an instance has already been initialized to avoid re-initialization.
         if not getattr(self, "_initialized", False):
             self.db_path = db_path
             # -- _initialized is set on the instance and not the class because setting it on the
