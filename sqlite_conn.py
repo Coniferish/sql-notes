@@ -39,7 +39,7 @@ class SQLiteConnectionContextManager:
         self.conn = sqlite3.connect(self.db_path)
         return self
 
-    # -- These params don't have to be used, but are required for context manager
+    # -- These params don't have to be used, but are required for context manager --
     def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any):
         if self.conn:
             self.conn.close()
@@ -84,7 +84,7 @@ class SQLiteConnectionEager:
         Best for: Simple scripts or applications with immediate database usage.
         """
         self.db_path = db_path
-        # -- Immediately establish connection:
+        # -- Immediately establish connection --
         self.conn: sqlite3.Connection | None = sqlite3.connect(self.db_path)
 
     def close(self):
@@ -133,7 +133,7 @@ class SQLiteConnectionLazy:
             self.conn = None
 
     def execute(self, query: str, params: tuple[str, ...]):
-        self._ensure_connection()  # Connects only when needed (when 'execute' is called)
+        self._ensure_connection()  # -- Connects only when needed (when 'execute' is called) --
         cursor = self._get_cursor()
         cursor.execute(query, params)
         assert self.conn is not None
@@ -165,7 +165,7 @@ class SQLiteConnectionSingleton:
       hard-code or otherwise inject the db_path early.
     """
 
-    # -- Class variables to hold the singleton instance and connection
+    # -- Class variables to hold the singleton instance and connection --
     _instance: "SQLiteConnectionSingleton | None" = None
     _conn: "sqlite3.Connection | None" = None
 
@@ -177,7 +177,7 @@ class SQLiteConnectionSingleton:
         same instance since _instance is a class variable that holds the singleton instance.
         """
         if cls._instance is None:
-            # Create a new instance of the class (super is the object class in this case):
+            # -- Create a new instance of the class (super is the object class in this case) --
             cls._instance = super().__new__(cls)
         return cls._instance
 
@@ -188,7 +188,7 @@ class SQLiteConnectionSingleton:
         every instantiation, even if the singleton already exists.
         We use a class variable guard (_initialized) to avoid re-initializing attributes (i.e. db_path).
         """
-        # -- Check if an instance has already been initialized to avoid re-initialization.
+        # -- Check if an instance has already been initialized to avoid re-initialization. --
         if not getattr(self, "_initialized", False):
             self.db_path = db_path
             # -- _initialized is set on the instance and not the class because setting it on the
