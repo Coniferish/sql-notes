@@ -170,10 +170,10 @@ class SQLiteConnectionSingleton:
     _conn: "sqlite3.Connection | None" = None
 
     def __new__(cls, db_path: str):
-        """__new__ is used to control instance creation (instantiation) and is called before __init__.
+        """__new__ is used to control/return an instance of the class (instantiation) and is called before __init__.
 
         Below is a common pattern for singletons in Python.
-        The first call to __new__ will create the instance, but subsequent calls will return the
+        The first call to __new__ will create the instance as normal, but subsequent calls will return the
         same instance since _instance is a class variable that holds the singleton instance.
         """
         if cls._instance is None:
