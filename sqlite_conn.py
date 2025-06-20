@@ -198,12 +198,12 @@ class SQLiteConnectionSingleton:
         else:
             if self.db_path != db_path:
                 raise ValueError(
-                    f"Singleton already initialized with db_path='{self.db_path}'. "
-                    f"Cannot reinitialize with '{db_path}'"
+                    f"Singleton already initialized with db_path='{self.db_path}'."
+                    f" Cannot reinitialize with '{db_path}'"
                 )
             logging.debug(
-                f"SQLiteConnectionSingleton already initialized with db_path='{self.db_path}'. "
-                "Using existing instance."
+                f"SQLiteConnectionSingleton already initialized with db_path='{self.db_path}'."
+                " Using existing instance."
             )
 
     def close(self):
