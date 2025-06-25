@@ -188,7 +188,7 @@ class SQLiteConnectionSingleton:
         every instantiation, even if the singleton already exists.
         We use a class variable guard (_initialized) to avoid re-initializing attributes (i.e. db_path).
         """
-        # -- Check if an instance has already been initialized to avoid re-initialization. --
+        # -- Check if an instance has already been initialized to avoid re-initialization --
         if not getattr(self, "_initialized", False):
             self.db_path = db_path
             # -- _initialized is set on the instance and not the class because setting it on the
@@ -237,20 +237,103 @@ class SQLiteConnectionSingleton:
 class SQLiteConnectionMultition:
     """Multition Pattern - allows multiple instances with different configurations.
 
+    Instead of allowing only one instance, this implementation maintains a registry of instances
+    based on configuration keys (db_path), allowing one instance per unique configuration key. This is
+    useful when you need multiple database connections but want to reuse connections for the same database.
+
     Pros:
-    - Multiple connections with different configurations
+    - Reuses instances for the same configuration (prevents duplicate connections)
     - Useful for applications needing multiple databases
-    - Each instance can have its own connection settings
+    - More flexible than Singleton while still controlling instance creation
 
     Cons:
     - More complex than Singleton
     - Need to manage multiple instances
     - Can lead to resource exhaustion if not managed properly
+    - Memory usage grows with number of unique configurations
 
-    Best for: Applications needing multiple database connections with different settings.
+    Best for: Applications needing multiple database connections with different settings,
+    such as microservices connecting to different databases or applications with
+    separate databases for different features.
+
+    Usage:
+        # These will be the same instance
+        db1 = SQLiteConnectionMultition("users.db")
+        db1_again = SQLiteConnectionMultition("users.db")
+
+        # This will be a different instance
+        db2 = SQLiteConnectionMultition("products.db")
     """
 
-    pass
+    # -- This dictionary persists across all instances and maintains the multition registry --
+    _instances: dict[str, "SQLiteConnectionMultition"] = {}
+
+    def __new__(cls, db_path: str):
+        """Controls instance creation - returns existing instance if one exists for this db_path."""
+        # -- Check if we already have an instance for this db_path --
+        if db_path not in cls._instances:
+            # -- Create new instance if none exists for this db_path --
+            cls._instances[db_path] = super().__new__(cls)
+        # -- Return the instance (either newly created or existing) --
+        return cls._instances[db_path]
+
+    def __init__(self, db_path: str):
+        """Initialize the multition instance with database path.
+
+        Like the Singleton pattern, __init__ runs every time the class is instantiated,
+        even if we return an existing instance from __new__. We use the _initialized
+        flag to prevent re-initialization of existing instances.
+        """
+        # -- Only initialize if this instance hasn't been initialized yet --
+        if not getattr(self, "_initialized", False):
+            self.db_path = db_path
+            # -- Store connection as private attribute, initially None (lazy connection).
+            # -- This follows the lazy connection pattern - we don't connect until needed.
+            self._conn: sqlite3.Connection | None = None
+            # -- Mark as initialized to prevent re-initialization --
+            self._initialized = True
+
+    def _ensure_connection(self):
+        """Quietly ensure the connection is established (lazy connection pattern)."""
+        if not self._conn:
+            self._conn = sqlite3.connect(self.db_path)
+
+    def close(self):
+        """Close the database connection and reset the connection attribute.
+
+        Note: This closes the connection but doesn't remove the instance from
+        the multition registry. The instance can be reconnected by calling
+        execute() again.
+        """
+        if self._conn:
+            self._conn.close()
+            self._conn = None
+
+    def execute(self, query: str, params: tuple[str, ...] = ()) -> sqlite3.Cursor:
+        """Execute a SQL query with parameters.
+
+        This method combines lazy connection establishment with query execution.
+        If no connection exists, it will be created automatically.
+        """
+        self._ensure_connection()
+        assert self._conn is not None, "Connection not established."
+        cursor = self._conn.cursor()
+        cursor.execute(query, params)
+        self._conn.commit()
+        return cursor
+
+    @classmethod
+    def reset(cls):
+        """Reset all instances for testing purposes.
+
+        This method is primarily for testing - it closes all connections and
+        clears the instance registry, allowing fresh instances to be created.
+        """
+        # -- Close all existing connections --
+        for instance in cls._instances.values():
+            instance.close()
+        # -- Clear the instance registry --
+        cls._instances.clear()
 
 
 class SQLiteConnectionPool:
