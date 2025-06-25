@@ -115,29 +115,29 @@ class SQLiteConnectionLazy:
 
     def __init__(self, db_path: str):
         self.db_path = db_path
-        self.conn = None
+        self._conn = None
 
     def _ensure_connection(self):
         """Quietly ensure the connection is established."""
-        if not self.conn:
-            self.conn = sqlite3.connect(self.db_path)
+        if not self._conn:
+            self._conn = sqlite3.connect(self.db_path)
 
     def _get_cursor(self) -> sqlite3.Cursor:
-        if not self.conn:
+        if not self._conn:
             raise RuntimeError("Database connection is not established.")
-        return self.conn.cursor()
+        return self._conn.cursor()
 
     def close(self):
-        if self.conn:
-            self.conn.close()
-            self.conn = None
+        if self._conn:
+            self._conn.close()
+            self._conn = None
 
     def execute(self, query: str, params: tuple[str, ...]):
         self._ensure_connection()  # -- Connects only when needed (when 'execute' is called) --
         cursor = self._get_cursor()
         cursor.execute(query, params)
-        assert self.conn is not None
-        self.conn.commit()
+        assert self._conn is not None
+        self._conn.commit()
         return cursor
 
 
@@ -206,6 +206,11 @@ class SQLiteConnectionSingleton:
                 " Using existing instance."
             )
 
+    def _ensure_connection(self):
+        """Quietly ensure the connection is established."""
+        if not self._conn:
+            self._conn = sqlite3.connect(self.db_path)
+
     def close(self):
         if self._conn:
             self._conn.close()
@@ -216,8 +221,8 @@ class SQLiteConnectionSingleton:
             self._conn = sqlite3.connect(self.db_path)
 
     def execute(self, query: str, params: tuple[str, ...] = ()) -> sqlite3.Cursor:
-        if self._conn is None:
-            raise RuntimeError("Connection not established. Call connect() first.")
+        self._ensure_connection()
+        assert self._conn is not None, "Connection not established."
         cursor = self._conn.cursor()
         cursor.execute(query, params)
         self._conn.commit()
