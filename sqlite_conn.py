@@ -337,24 +337,234 @@ class SQLiteConnectionMultition:
 
 
 class SQLiteConnectionPool:
-    """
-    Connection Pool Pattern - manages multiple connections for concurrent access.
+    """Connection Pool Pattern with Singleton-per-Database.
+
+    A connection pool maintains a collection of database connections that can be
+    reused across multiple operations. This implementation uses a singleton pattern
+    per database path, ensuring that multiple requests for the same database
+    share the same connection pool.
+
+    This pattern is especially useful for multi-threaded applications where multiple
+    threads need database access simultaneously. SQLite supports concurrent reads
+    but only one write at a time, so pooling helps manage this efficiently.
 
     Pros:
     - Better performance for multi-threaded applications
-    - Reuses connections instead of creating new ones
-    - Can limit the number of concurrent connections
+    - Reuses connections instead of creating new ones (reduces overhead)
+    - Can limit the number of concurrent connections (prevents resource exhaustion)
     - Handles connection lifecycle automatically
+    - Provides thread-safe access to database connections
+    - Reduces connection setup/teardown overhead
+    - Prevents multiple pools for the same database (singleton per db_path)
 
     Cons:
     - More complex implementation
-    - Additional overhead for simple applications
-    - Need to handle thread safety
+    - Need to handle thread safety carefully
+    - Memory overhead of maintaining multiple connections
+    - Potential for connection leaks if not managed properly
 
-    Best for: Multi-threaded applications with frequent database access.
+    Best for: Multi-threaded applications with frequent database access, web servers,
+    or applications with burst database activity patterns.
+
+    Note: SQLite has some limitations with concurrent writes, so this pool is most
+    beneficial for read-heavy workloads or when you need to manage connection limits.
+
+    Usage:
+        # These will return the same pool instance
+        pool1 = SQLiteConnectionPool("database.db", pool_size=5)
+        pool2 = SQLiteConnectionPool("database.db", pool_size=3)  # pool_size ignored, uses existing
+
+        # Get a connection from the pool
+        with pool1.get_connection() as conn:
+            conn.execute("SELECT * FROM users", ())
     """
 
-    pass
+    # -- Class variable to store pool instances keyed by db_path --
+    _instances: dict[str, "SQLiteConnectionPool"] = {}
+
+    def __new__(cls, db_path: str, pool_size: int = 5):
+        """Controls instance creation - returns existing pool if one exists for this db_path.
+
+        This implements a singleton pattern per database path, ensuring that
+        multiple requests for pools to the same database return the same pool instance.
+
+        Note: pool_size is not used because we implement singleton-per-database,
+        meaning the first pool created for a database determines its configuration. Subsequent
+        initializations with different pool_size values will be ignored. But it's included to match
+        the constructor signature.
+        """
+        # -- Check if we already have a pool for this db_path --
+        if db_path not in cls._instances:
+            # -- Create new pool instance if none exists for this db_path --
+            cls._instances[db_path] = super().__new__(cls)
+        # -- Return the pool instance (either newly created or existing) --
+        return cls._instances[db_path]
+
+    def __init__(self, db_path: str, pool_size: int = 5):
+        """Initialize the connection pool.
+
+        Like the Singleton pattern, __init__ runs every time the class is instantiated,
+        even if we return an existing instance from __new__. We use the _initialized
+        flag to prevent re-initialization of existing pools.
+
+        Args:
+            db_path: Path to the SQLite database file
+            pool_size: Maximum number of connections to maintain in the pool
+        """
+        # -- Only initialize if this pool hasn't been initialized yet --
+        if not getattr(self, "_initialized", False):
+            # -- In production code these would be imported at module level --
+            import threading
+            import queue
+
+            self.db_path = db_path
+            self.pool_size = pool_size
+
+            # -- Use a thread-safe queue to store available connections.
+            # -- queue.Queue is thread-safe and blocks when empty (get()) or full (put()).
+            self._free_connections: queue.Queue[sqlite3.Connection] = queue.Queue(
+                maxsize=pool_size
+            )
+
+            # -- Track of all connections for cleanup --
+            self._all_connections: list[sqlite3.Connection] = []
+
+            # -- Thread lock for protecting connection creation.
+            # -- This ensures only one thread creates connections at a time.
+            self._lock = threading.Lock()
+
+            # -- Pre-populate the pool with initial connections --
+            self._initialize_pool()
+
+            # -- Mark as initialized to prevent re-initialization --
+            self._initialized = True
+        else:
+            # -- Pool already exists for this db_path, optionally warn about ignored parameters --
+            if self.pool_size != pool_size:
+                logger.debug(
+                    f"SQLiteConnectionPool already initialized for '{db_path}' with pool_size={self.pool_size}. "
+                    f"Ignoring new pool_size={pool_size}"
+                )
+
+    def borrow_connection(self) -> sqlite3.Connection:
+        """Internal method to borrow a connection from the pool.
+
+        This method blocks until a connection becomes available.
+        Used internally by PooledConnection context manager.
+        """
+        # -- This will block if no connections are available --
+        return self._free_connections.get()
+
+    def _initialize_pool(self):
+        """Pre-populate the pool with initial connections.
+
+        This creates the initial set of connections when the pool is created,
+        so they're ready for immediate use.
+        """
+        for _ in range(self.pool_size):
+            # -- check_same_thread=False allows connection to be used across threads.
+            # -- By default, SQLite connections can only be used in the thread that created them.
+            conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            self._all_connections.append(conn)
+            self._free_connections.put(conn)
+
+    def return_connection(self, conn: sqlite3.Connection):
+        """Internal method to return a connection to the pool.
+
+        Used internally by PooledConnection context manager.
+        """
+        # -- Put the connection back in the available queue --
+        self._free_connections.put(conn)
+
+    def close_all(self):
+        """Close all connections in the pool.
+
+        This should be called when shutting down the application to properly
+        clean up all database connections.
+        """
+        # -- Close all connections we've created --
+        for conn in self._all_connections:
+            conn.close()
+
+        # -- Clear the collections --
+        self._all_connections.clear()
+
+        # -- Empty the queue of any remaining connections --
+        while not self._free_connections.empty():
+            try:
+                self._free_connections.get_nowait()
+            # -- Not best practice, but we want to avoid blocking here --
+            except Exception:
+                break
+
+    def execute(self, query: str, params: tuple[str, ...] = ()) -> sqlite3.Cursor:
+        """Execute a query using a connection from the pool.
+
+        This is a convenience method that borrows a connection, executes the query,
+        and returns the connection to the pool automatically.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            conn.commit()
+            return cursor
+
+    def get_connection(self):
+        """Get a connection from the pool.
+
+        Returns a PooledConnection context manager that automatically returns
+        the connection to the pool when done.
+
+        This method blocks if no connections are available until one is returned.
+        """
+        return PooledConnection(self)
+
+    @classmethod
+    def reset(cls):
+        """Reset all pool instances for testing purposes.
+
+        This method is primarily for testing - it closes all connections in all pools
+        and clears the instance registry, allowing fresh pools to be created.
+        """
+        # -- Close all connections in all pools --
+        for pool in cls._instances.values():
+            pool.close_all()
+        # -- Clear the instance registry --
+        cls._instances.clear()
+
+
+class PooledConnection:
+    """Context manager for managing the lifecycle of a single borrowed connection.
+
+    This context manager ensures that connections borrowed from the pool
+    are always returned, even if an exception occurs during database operations.
+
+    This follows the RAII (Resource Acquisition Is Initialization) pattern,
+    ensuring proper resource cleanup.
+    """
+
+    def __init__(self, pool: SQLiteConnectionPool):
+        """Initialize with a reference to the connection pool."""
+        self.pool = pool
+        self.conn: sqlite3.Connection | None = None
+
+    def __enter__(self) -> sqlite3.Connection:
+        """Borrow a connection from the pool when entering the context."""
+        # -- Get a connection from the pool (this may block if none available) --
+        self.conn = self.pool.borrow_connection()
+        return self.conn
+
+    # -- These params don't have to be used, but are required for context manager --
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any):
+        """Return the connection to the pool when exiting the context.
+
+        This is called automatically when exiting the 'with' block,
+        even if an exception occurred.
+        """
+        if self.conn:
+            # -- Return the connection to the pool for reuse --
+            self.pool.return_connection(self.conn)
+            self.conn = None
 
 class SQLiteConnectionFactory:
     pass
