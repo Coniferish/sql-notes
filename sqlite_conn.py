@@ -145,6 +145,17 @@ class SQLiteConnectionSingleton:
     """
     Singleton Pattern - ensures only one connection instance exists and has lazy initialization.
 
+    The singleton pattern restricts the instantiation of a class to one "single" instance. In this
+    case, it ensures that only one SQLiteConnectionSingleton instance is created. Within this class,
+    we're also restricting access to only a single db connection (_conn). Below in the
+    SQLiteConnectionMultition class, we allow multiple instances of the class, but each instance
+    must have a unique configuration (in that case, a single instance for each db_path), so it's not a true
+    singleton. In the SQLiteConnectionPool class, we allow multiple connections to the same
+    database, but we control the number of connections to prevent overwhelming the database
+    through a singleton-like pattern (it's actually also a multition) by restricting instantiation
+    to a single connection pool. So while multiple connections can exist, they are all managed by
+    the single pool instance.
+
     Pros:
     - Guarantees single connection across application
     - Prevents overhead from multiple connections
@@ -337,16 +348,24 @@ class SQLiteConnectionMultition:
 
 
 class SQLiteConnectionPool:
-    """Connection Pool Pattern with Singleton-per-Database.
+    """Connection Pool Pattern with Singleton-per-Database (multiton pattern).
 
     A connection pool maintains a collection of database connections that can be
     reused across multiple operations. This implementation uses a singleton pattern
     per database path, ensuring that multiple requests for the same database
-    share the same connection pool.
+    share the same connection pool, preventing proliferation of connections.
 
     This pattern is especially useful for multi-threaded applications where multiple
     threads need database access simultaneously. SQLite supports concurrent reads
     but only one write at a time, so pooling helps manage this efficiently.
+
+    Note: See the docstring in SQLiteConnectionSingleton for more background.
+
+    Note that because we are creating a pool of live connections, we also need to manage their
+    lifecycle carefully. Connections should be returned to the pool when no longer needed or there
+    is an error, and the pool should be closed properly to release resources. To facilitate this,
+    we use a context manager (PooledConnection) that automatically returns connections to the pool
+    when done. `PooledConnection` encapsulates this behavior.
 
     Pros:
     - Better performance for multi-threaded applications
@@ -446,15 +465,6 @@ class SQLiteConnectionPool:
                     f"Ignoring new pool_size={pool_size}"
                 )
 
-    def borrow_connection(self) -> sqlite3.Connection:
-        """Internal method to borrow a connection from the pool.
-
-        This method blocks until a connection becomes available.
-        Used internally by PooledConnection context manager.
-        """
-        # -- This will block if no connections are available --
-        return self._free_connections.get()
-
     def _initialize_pool(self):
         """Pre-populate the pool with initial connections.
 
@@ -468,13 +478,14 @@ class SQLiteConnectionPool:
             self._all_connections.append(conn)
             self._free_connections.put(conn)
 
-    def return_connection(self, conn: sqlite3.Connection):
-        """Internal method to return a connection to the pool.
+    def borrow_connection(self) -> sqlite3.Connection:
+        """Borrow a connection from the pool.
 
+        This method blocks until a connection becomes available.
         Used internally by PooledConnection context manager.
         """
-        # -- Put the connection back in the available queue --
-        self._free_connections.put(conn)
+        # -- This will block if no connections are available --
+        return self._free_connections.get()
 
     def close_all(self):
         """Close all connections in the pool.
@@ -518,6 +529,14 @@ class SQLiteConnectionPool:
         This method blocks if no connections are available until one is returned.
         """
         return PooledConnection(self)
+
+    def return_connection(self, conn: sqlite3.Connection):
+        """Return a connection to the pool.
+
+        Used internally by PooledConnection context manager.
+        """
+        # -- Put the connection back in the available queue --
+        self._free_connections.put(conn)
 
     @classmethod
     def reset(cls):
