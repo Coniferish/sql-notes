@@ -351,13 +351,15 @@ class SQLiteConnectionPool:
     """Connection Pool Pattern with Singleton-per-Database (multiton pattern).
 
     A connection pool maintains a collection of database connections that can be
-    reused across multiple operations. This implementation uses a singleton pattern
-    per database path, ensuring that multiple requests for the same database
-    share the same connection pool, preventing proliferation of connections.
+    reused across multiple operations, leveraging a database's ability to handle concurrent
+    connections (the specifications of this depends on the database and how it's being used (reads
+    vs writes)). This implementation uses a quasi-singleton pattern per database path, ensuring that
+    multiple requests for the same database share the same *connection pool*, preventing
+    proliferation of connections.
 
     This pattern is especially useful for multi-threaded applications where multiple
     threads need database access simultaneously. SQLite supports concurrent reads
-    but only one write at a time, so pooling helps manage this efficiently.
+    but only one write at a time, so pooling helps manage this.
 
     Note: See the docstring in SQLiteConnectionSingleton for more background.
 
@@ -483,6 +485,11 @@ class SQLiteConnectionPool:
 
         This method blocks until a connection becomes available.
         Used internally by PooledConnection context manager.
+
+        Note: This should not be a public method, but with this current pattern, it can't be made
+        private because it needs to be called from the PooledConnection context manager. A better
+        pattern would be to make this a private method and use a Composition pattern.
+        https://claude.ai/chat/3ae4d343-795f-450d-97ea-8cf440e0332d
         """
         # -- This will block if no connections are available --
         return self._free_connections.get()

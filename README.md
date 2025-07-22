@@ -14,7 +14,7 @@ The first mock-project is a bookshelf app where users can organize books they've
 
 ### Entities
 
-Using [excalidraw](https://excalidraw.com/), I started sketching the entities and attributes
+Using [excalidraw](https://excalidraw.com/) and pseudo Barker's notation symbols, I started sketching the entities and attributes
 bookshelf app would require.
 
 ![][sketch1]
