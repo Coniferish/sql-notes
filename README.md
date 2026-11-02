@@ -3,7 +3,9 @@ This repo contains notes on SQL and was created so I could practice creating SQL
 The first mock-project is a bookshelf app where users can organize books they've read and want to read.
 
 ---
+
 ### Designing a schema:
+
 1. Identify entities\*
 2. List attributes
 3. Define relationships
@@ -21,16 +23,19 @@ Using [excalidraw](https://excalidraw.com/) and pseudo Barker's notation symbols
 This is very naive and incomplete, but a starting point as this is a made up project and I arbitrarily knew I wanted "users" to categorize books according to status and to be able to rate books. It would be better to start with a defined list of requirements, but... I didn't.
 
 ---
+
 ![][sketch2]
 
 There are a few changes in this step. I realized "Author" should be its own entity since it would be nice to browse books by author as well. I also merged "Reading Status" and "Rating" into a new entity, "User's Books", which contains those concepts as attributes, realizing that the status would be an enum type and rating would be an int range. I also added in "start", "finish", and "added" dates as attributes for good measure.
 
 ---
+
 ![][sketch3]
 
 The main change here is starting to add relationships between the tables and creating primary keys.
 
 ---
+
 ![][sketch4]
 
 In this step I fix a couple of things after thinking more about the relationships.
@@ -56,6 +61,7 @@ but it's unlikely we will know all of the genres at the beginning and if any cha
 Second, and similar to the issue above, I fixed a many-to-many relationship between the `book` and `author` tables by creating a `book_authors` table (side note: I decided to adopt the convention of creating junction table names as a combination of the tables it was connecting. This means I'll end up changing "User's Book Status" to just `user_books` for the table name since the apostrophe can't be used in the table name if we want to be consistent in naming conventions, which I've come to prefer.)
 
 ---
+
 ### Schema
 
 Below we have the full schema declaration containing the following:
@@ -129,6 +135,7 @@ Some additional notes:
 - `ON DELETE CASCADE` means that if a book is deleted in the parent table that attribute is "referencing", any rows that point to that parent are also deleted. This prevents "orphaned" entries. For example, in the `user_books` table, the `user_id` attribute references `users(id)`, so when a user in the `users` table is deleted, the deletion "cascades" down to `user_books` as well and deletes their saved books.
 
 ---
+
 ### Queries and indexes
 
 This is a sample list of queries I'll probably want. For more notes on indexes beyond what's discussed below, [click here][indexes-link].
@@ -147,6 +154,7 @@ CREATE INDEX idx_books_title ON books(title);
 ```
 
 ---
+
 #### Get all user books
 
 ```sql
@@ -159,6 +167,7 @@ WHERE ub.user_id = 1;
 Because the `user_books` table has a composite primary key of `(user_id, book_id)`, it would probably not be beneficial to have an index for this query. The db will efficiently filter by `user_id`, and for each matching row the db performs a lookup in the `books` table using `book_id`. Since that's also the primary key for that table (`books.id`), this part is also efficient.
 
 ---
+
 #### Get all user's books of a particular reading status
 
 ```sql
@@ -176,6 +185,7 @@ CREATE INDEX idx_user_books_user_id_status ON user_books(user_id, status);
 ```
 
 ---
+
 #### Get all books by an author
 
 ```sql
@@ -201,6 +211,7 @@ CREATE INDEX idx_book_authors_author ON book_authors(author_id)
 Finally, the `books` table is queried using the `book.id`, which won't need an index.
 
 ---
+
 #### Get all books in a genre
 
 ```sql
@@ -220,7 +231,15 @@ CREATE INDEX idx_book_genres_genre ON book_genres(genre_id)
 For each book, it would then look up the book in the `books` table.
 
 ---
+
+### More notes
+
+- [JOINs](./joins-notes.md): which table is "left", INNER vs. LEFT, the `WHERE`-on-a-LEFT-JOIN trap, and finding rows with no match
+
+---
+
 ### Future topics to add:
+
 - Complicated JOINs
 - Transactions
 - DB Migrations
