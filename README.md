@@ -247,6 +247,11 @@ For each book, it would then look up the book in the `books` table.
 
 <!-- LINK SOURCES -->
 
-[sketch1]: ./images/sketch1.png [sketch2]: ./images/sketch2.png [sketch3]: ./images/sketch3.png [sketch4]: ./images/sketch4.png [normalization-link]: ./normalization-notes.md [indexes-link]: ./indexes-notes.md
+[sketch1]: ./images/sketch1.png
+[sketch2]: ./images/sketch2.png
+[sketch3]: ./images/sketch3.png
+[sketch4]: ./images/sketch4.png
+[normalization-link]: ./normalization-notes.md
+[indexes-link]: ./indexes-notes.md
 
 <!-- END LINK REFERENCES -->
