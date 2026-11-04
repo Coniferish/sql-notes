@@ -28,9 +28,12 @@ documents
   application_id      -- owner FK
   document_type_id    -- type (lookup table: pay stub, tax return, ID...)
   status              -- pending_review | approved | needs_resubmission
-  created_at, updated_at
-  reviewed_by, reviewed_at
-  s3_key, review_note -- what the prompt named
+  created_at
+  updated_at
+  reviewed_by
+  reviewed_at
+  s3_key              -- what the prompt named
+  review_note         -- what the prompt named
 ```
 
 ---
@@ -51,11 +54,18 @@ expenses
   employee_id            -- owner FK
   category               -- travel | meals | supplies (enum, or a lookup table)
   status                 -- submitted | approved | rejected | reimbursed
-  amount_cents, currency, spent_on (date), description
+  amount_cents
+  currency
+  spent_on (date)
+  description
   receipt_s3_key         -- file in object storage
-  created_at, updated_at
-  reviewed_by, reviewed_at, rejection_reason
-  reimbursed_at, payroll_run_id
+  created_at
+  updated_at
+  reviewed_by
+  reviewed_at
+  rejection_reason
+  reimbursed_at
+  payroll_run_id
 ```
 
 The manager comes from the employee record (`employees.manager_id`), so you don't store it on each expense.
@@ -74,8 +84,10 @@ holds
   patron_id              -- owner FK
   book_id                -- FK to the title (not a specific copy)
   status                 -- waiting | ready_for_pickup | picked_up | expired | cancelled
-  created_at, updated_at -- created_at doubles as queue order
-  ready_at, pickup_deadline
+  created_at             -- doubles as queue order
+  updated_at
+  ready_at
+  pickup_deadline
   copy_id                -- set once a specific copy is held for them
 ```
 
@@ -93,16 +105,20 @@ holds
 tickets
   id
   customer_id            -- owner FK
-  category, priority     -- priority: low | normal | high | urgent
+  category
+  priority               -- low | normal | high | urgent
   status                 -- open | in_progress | waiting_on_customer | resolved
   subject
   assigned_agent_id
-  created_at, updated_at, resolved_at
+  created_at
+  updated_at
+  resolved_at
 
 ticket_messages          -- the "thread" is a second table
   id
   ticket_id              -- owner FK
-  author_type, author_id -- customer or agent
+  author_type            -- customer or agent
+  author_id
   body
   created_at
 ```
@@ -126,8 +142,10 @@ reservations
   reserved_for           -- timestamp (date + time)
   status                 -- requested | confirmed | cancelled | seated | no_show
   special_requests
-  created_at, updated_at
-  confirmed_by, cancelled_at
+  created_at
+  updated_at
+  confirmed_by
+  cancelled_at
 ```
 
 A good clarifying question: are specific tables assigned at booking time? If so, add `table_id`, and double-booking becomes a uniqueness or overlap problem worth mentioning.
@@ -144,12 +162,18 @@ A good clarifying question: are specific tables assigned at booking time? If so,
 wire_transfers
   id
   account_id             -- owner FK (the account the money leaves from)
-  amount_cents, currency
-  beneficiary_name, beneficiary_account, beneficiary_bank_routing
+  amount_cents
+  currency
+  beneficiary_name
+  beneficiary_account
+  beneficiary_bank_routing
   status                 -- draft | pending_approval | approved | rejected | sent | failed
-  created_by, created_at
-  approved_by, approved_at   -- CHECK (approved_by <> created_by)
-  sent_at, external_reference
+  created_by
+  created_at
+  approved_by            -- CHECK (approved_by <> created_by)
+  approved_at
+  sent_at
+  external_reference
   updated_at
 ```
 
@@ -170,7 +194,8 @@ applications
   job_posting_id         -- unique (candidate_id, job_posting_id): one application per job
   stage                  -- applied | screen | interview | offer | hired | rejected
   resume_s3_key
-  created_at, updated_at
+  created_at
+  updated_at
 
 interview_feedback       -- several interviewers per application
   id
