@@ -235,6 +235,7 @@ For each book, it would then look up the book in the `books` table.
 ### More notes
 
 - [JOINs](./joins-notes.md): which table is "left", INNER vs. LEFT, the `WHERE`-on-a-LEFT-JOIN trap, and finding rows with no match
+- [Quick schema design](./quick-schema-design.md): a reusable table skeleton for sketching a schema in 2 minutes, plus 6 timed practice prompts
 
 ---
 
