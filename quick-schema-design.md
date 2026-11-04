@@ -7,7 +7,7 @@ In a system design question you get a couple of minutes for the data model, not 
 Most "workflow" features (something gets created, moves through states, and someone acts on it) fit this shape:
 
 1. **`id`**: primary key.
-2. **Owner FK**: what this record belongs to (`customer_id`, `application_id`, `account_id`). Ask "belongs to what?" It's often not the user directly.
+2. **Owner FK**: the parent record this row lives under (`account_id`, `application_id`, `ticket_id`). Ask "belongs to what?", and test it: which screen lists these rows? Do they go away when the parent does? Could two people share it? It's often not the user. Transactions belong to an account, because a joint account has two customers. And the owner isn't always the author: a ticket message belongs to its ticket, even though a person wrote it.
 3. **Type**: what kind of thing it is (`document_type_id`, `category`). Use a lookup table if the business will add types, or an enum if the list is fixed. This is the same enum-vs-table trade-off as `genres` in the README.
 4. **Status, with the states named**: e.g. `pending_review`, `approved`, `rejected`. Saying the states out loud shows you've thought about the workflow.
 5. **Timestamps**: `created_at` and `updated_at`. Add **`<actor>_by` / `<actor>_at`** (`reviewed_by`, `reviewed_at`) when a person acts on the record.
